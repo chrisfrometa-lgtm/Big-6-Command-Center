@@ -1443,6 +1443,7 @@ function updateMyTeamSettings() {
       }
     }
   }
+  saveSettings();
 }
 
 function resetDraftBoard() {
@@ -2075,6 +2076,59 @@ function closePlayerCard() {
   document.getElementById('player-card-modal').classList.remove('open');
 }
 
+// ── SETTINGS PERSISTENCE ─────────────────────────────────────────
+const SETTINGS_KEY = 'b6_settings_v1';
+const DEFAULT_SETTINGS = {
+  mySlot: 2,
+  myTeamName: 'Myself',
+  oppNames: { 1:'Jack', 2:'Myself', 3:'Gio', 4:'Torsi', 5:'Matt', 6:'Rob' }
+};
+
+function saveSettings() {
+  const slot = document.getElementById('my-slot-select')?.value || myDraftPos;
+  const name = document.getElementById('my-team-name')?.value.trim() || 'Myself';
+  const oppNames = {};
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById(`opp-slot-${i}`);
+    if (el) oppNames[i] = el.value.trim();
+  }
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ mySlot: slot, myTeamName: name, oppNames }));
+}
+
+function loadSettings() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch(e) {}
+  if (!s) s = DEFAULT_SETTINGS;
+
+  const nameEl = document.getElementById('my-team-name');
+  if (nameEl) nameEl.value = s.myTeamName || 'Myself';
+
+  if (s.mySlot) {
+    myDraftPos = String(s.mySlot);
+    const sel = document.getElementById('my-slot-select');
+    if (sel) sel.value = String(s.mySlot);
+    const inp = document.getElementById('draft-pos-input');
+    if (inp) inp.value = s.mySlot;
+  }
+
+  if (s.oppNames) {
+    for (let i = 1; i <= 6; i++) {
+      const el = document.getElementById(`opp-slot-${i}`);
+      if (!el) continue;
+      const isMe = String(i) === String(s.mySlot);
+      el.value = isMe ? '' : (s.oppNames[i] || '');
+      if (isMe) {
+        el.style.color = 'var(--gold)';
+        el.style.fontWeight = '800';
+        el.placeholder = s.myTeamName || 'YOU';
+      }
+    }
+  }
+
+  checkPickBanner();
+  renderDraftBoard();
+}
+
 // ── INIT ──
 (function init(){
   // Build opponent name inputs in Settings tab
@@ -2084,11 +2138,12 @@ function closePlayerCard() {
     oppGrid.innerHTML = [1,2,3,4,5,6].map(slot=>`
       <div class="opp-input-wrap">
         <span class="opp-slot-badge" style="color:${colors[slot-1]};">${slot}</span>
-        <input class="opp-input" id="opp-slot-${slot}" placeholder="Team ${slot}" maxlength="18"
+        <input class="opp-input" id="opp-slot-${slot}" placeholder="Team ${slot}" maxlength="18" oninput="saveSettings()"
           ${slot===parseInt(myDraftPos||0)?'style="color:var(--gold);font-weight:800;" placeholder="YOU"':''}
         >
       </div>`).join('');
   }
+  loadSettings();
 
   const key = getApiKey();
   if (key) {
